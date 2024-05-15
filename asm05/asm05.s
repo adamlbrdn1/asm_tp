@@ -2,6 +2,8 @@ section .data
     result_msg db "", 0
     result_msg_len equ $ - result_msg
     buffer db 0
+    error_msg db "Error: No input provided", 0
+    error_msg_len equ $ - error_msg
 
 section .bss
     num1 resq 1
@@ -13,24 +15,35 @@ section .text
     global _start
 
 _start:
+    ; Check if parameters are present
+    cmp qword [rsp + 16], 0
+    je .no_input_error
+    cmp qword [rsp + 24], 0
+    je .no_input_error
+
+    ; Convert first parameter to integer
     mov rsi, [rsp + 16]  
     mov rdi, num1
     call string_to_int
-    
+
+    ; Convert second parameter to integer
     mov rsi, [rsp + 24]  
     mov rdi, num2
     call string_to_int
-    
+
+    ; Add the numbers
     mov rax, [num1]
     add rax, [num2]
     mov [result], rax
     
+    ; Display the result
     mov rdi, 1         
     mov rsi, result_msg
     mov rdx, result_msg_len
     mov rax, 1          
     syscall
-    
+
+    ; Convert result to string
     mov rax, [result]
     mov rdi, temp        
     call int_to_string
@@ -40,6 +53,19 @@ _start:
     ; Exit
     mov rax, 60          
     xor rdi, rdi        
+    syscall
+
+.no_input_error:
+    ; Display error message
+    mov rdi, 1
+    mov rsi, error_msg
+    mov rdx, error_msg_len
+    mov rax, 1
+    syscall
+
+    ; Exit with error
+    mov rax, 60
+    mov rdi, 1
     syscall
 
 
