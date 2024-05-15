@@ -18,30 +18,20 @@ _start:
     mov rdx, 2          
     syscall
 
-  
     movzx eax, byte [input]  
     sub eax, '0'             
     test al, 1               
-    jnz _odd                 
+    jnz _odd                  
 
-_even:
     
-    mov rax, 60
-    xor rdi, rdi
-    syscall
+    mov eax, 0
+    jmp _exit
 
 _odd:
-    mov byte [msg], '1'  
-    jmp _print_result
+    mov eax, 1
 
-_print_result:
-    
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, msg
-    mov rdx, msg_len
-    syscall
-
+_exit:
+    mov rdi, rax       
     mov rax, 60
-    xor rdi, rdi
     syscall
+
