@@ -1,64 +1,116 @@
-global _start
+section .data
+    result_msg db "", 0
+    result_msg_len equ $ - result_msg
+    buffer db 0
+    error_msg db "Error: No input provided", 0
+    error_msg_len equ $ - error_msg
 
 section .bss
-    input resb 32  ; Réservation de 32 octets pour l'entrée utilisateur
+    num resq 1
+    result resq 1
+    temp resb 21  
 
 section .text
+    global _start
+
 _start:
+    cmp qword [rsp + 16], 0
+    je .no_input_error
 
-    ; Lecture de l'entrée utilisateur
-    mov rax, 0      ; Code syscall pour sys_read
-    mov rdi, 0      ; Descripteur de fichier stdin
-    mov rsi, input  ; Pointeur vers l'emplacement où stocker l'entrée
-    mov rdx, 32     ; Nombre maximum d'octets à lire
+    mov rsi, [rsp + 16]  
+    mov rdi, num
+    call string_to_int
+
+    mov rax, 0
+    mov rcx, [num]
+    dec rcx
+    .sum_loop:
+        test rcx, rcx
+        js .sum_done
+        add rax, rcx
+        dec rcx
+        jmp .sum_loop
+    .sum_done:
+    mov [result], rax
+    
+    mov rdi, 1         
+    mov rsi, result_msg
+    mov rdx, result_msg_len
+    mov rax, 1          
     syscall
 
-    ; Conversion de la chaîne d'entrée en nombre entier
-    mov rdi, 0      ; Indice pour parcourir la chaîne d'entrée
-    xor r8, r8      ; Initialise le résultat à zéro
-    xor rax, rax    ; Réinitialisation d'AL à zéro
-convert_loop:
-    mov al, [input + rdi]  ; Charge un caractère de la chaîne d'entrée dans AL
-    cmp al, 10             ; Comparaison avec la valeur ASCII de la nouvelle ligne
-    je input_done          ; Si c'est une nouvelle ligne, terminer la saisie
-    cmp al, '0'            ; Comparaison avec le caractère '0'
-    jl error               ; Si c'est inférieur à '0', c'est une erreur
-    cmp al, '9'            ; Comparaison avec le caractère '9'
-    jg error               ; Si c'est supérieur à '9', c'est une erreur
-    sub al, 48             ; Convertit le caractère ASCII en nombre entier
-    imul r8, r8, 10        ; Multiplie le résultat actuel par 10
-    add r8, rax            ; Ajoute la valeur convertie
-    inc rdi                ; Passage au prochain caractère
-    jmp convert_loop       ; Boucle pour le prochain caractère
+    mov rax, [result]
+    mov rdi, temp        
+    call int_to_string
+    mov rsi, rdi        
+    call print_string
 
-input_done:
-    ; Calcul de la somme des nombres entiers strictement inférieurs à la valeur donnée
-    xor rdi, rdi       ; Réinitialisation de RDI à zéro pour utilisation future
-    xor rax, rax       ; Réinitialisation de RAX à zéro
-    mov rcx, 1         ; Initialise le compteur à 1
-sum_loop:
-    cmp rcx, r8        ; Compare le compteur avec la valeur donnée
-    jg sum_done        ; Si le compteur est supérieur à la valeur, terminer
-    add rax, rcx       ; Ajoute le compteur à la somme
-    inc rcx            ; Incrémente le compteur
-    jmp sum_loop       ; Boucle pour le prochain nombre
-
-sum_done:
-    ; Affichage de la somme calculée
-    mov rax, 1         ; Code syscall pour sys_write
-    mov rdi, 1         ; Descripteur de fichier stdout
-    mov rsi, rax       ; Adresse de la somme à afficher
-    mov rdx, 10        ; Longueur de la somme (1 byte pour le caractère de nouvelle ligne)
+    mov rax, 60          
+    xor rdi, rdi        
     syscall
 
-    ; Sortie du programme
-    mov rax, 60        ; Code syscall pour sys_exit
-    xor rdi, rdi       ; Code de retour 0
+.no_input_error:
+    mov rdi, 1
+    mov rsi, error_msg
+    mov rdx, error_msg_len
+    mov rax, 1
     syscall
 
-error:
-    ; Gestion des erreurs
-    mov rax, 60        ; Code syscall pour sys_exit
-    mov rdi, 1         ; Code de retour 1 pour les erreurs
+    mov rax, 60
+    mov rdi, 1
     syscall
+
+
+string_to_int:
+    xor rax, rax
+    xor rcx, rcx
+.loop:
+    movzx rdx, byte [rsi + rcx]
+    cmp rdx, 0
+    je .end
+    sub rdx, '0'
+    imul rax, rax, 10
+    add rax, rdx
+    inc rcx
+    jmp .loop
+.end:
+    mov [rdi], rax
+    ret
+
+
+int_to_string:
+    mov rcx, 10
+    mov rbx, 0           
+    add rdi, 20         
+    mov byte [rdi], 0    
+    dec rdi
+.convert_loop:
+    xor rdx, rdx
+    div rcx
+    add dl, '0'
+    mov [rdi], dl
+    dec rdi
+    test rax, rax
+    jnz .convert_loop
+    test rbx, rbx
+    jz .no_sign
+    mov byte [rdi], '-'
+    dec rdi
+.no_sign:
+    inc rdi
+    ret
+
+
+print_string:
+    mov rdx, 0
+    .find_end:
+        cmp byte [rsi + rdx], 0
+        je .found_end
+        inc rdx
+        jmp .find_end
+    .found_end:
+    mov rax, 1
+    mov rdi, 1        
+    syscall
+    ret
 
